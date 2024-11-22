@@ -1,0 +1,196 @@
+---
+- name: Install Development Tools on Linux
+  hosts: localhost
+  become: yes
+  vars:
+    download_dir: "/opt/installers"
+    java_version: "21.0.2"
+    maven_version: "3.8.6"
+    nodejs_version: "20.11.1"
+    postgresql_version: "16"
+
+  tasks:
+    # Prepare system and create directories
+    - name: Install required system packages
+      package:
+        name:
+          - wget
+          - tar
+          - unzip
+          - curl
+        state: present
+
+    - name: Create download directory
+      file:
+        path: "{{ download_dir }}"
+        state: directory
+        mode: '0755'
+
+    # Java Installation
+    - name: Download Java
+      get_url:
+        url: "https://download.oracle.com/java/21/archive/jdk-21.0.2_linux-x64_bin.tar.gz"
+        dest: "{{ download_dir }}/java.tar.gz"
+
+    - name: Create Java installation directory
+      file:
+        path: "/usr/lib/jvm"
+        state: directory
+
+    - name: Extract Java
+      unarchive:
+        src: "{{ download_dir }}/java.tar.gz"
+        dest: "/usr/lib/jvm"
+        creates: "/usr/lib/jvm/jdk-17.0.2"
+        remote_src: yes
+
+    # Maven Installation
+    - name: Download Maven
+      get_url:
+        url: "https://archive.apache.org/dist/maven/maven-3/3.8.6/binaries/apache-maven-3.8.6-bin.tar.gz"
+        dest: "{{ download_dir }}/maven.tar.gz"
+
+    - name: Create Maven directory
+      file:
+        path: "/opt/maven"
+        state: directory
+
+    - name: Extract Maven
+      unarchive:
+        src: "{{ download_dir }}/maven.tar.gz"
+        dest: "/opt/maven"
+        creates: "/opt/maven/apache-maven-3.8.6"
+        remote_src: yes
+
+    # Node.js Installation
+    #- name: Create Node.js directory
+    #  file:
+    #    path: "/opt/nodejs"
+    #    state: directory
+
+    #- name: Download Node.js
+    #  get_url:
+    #    url: "https://nodejs.org/dist/v20.11.1/node-v20.11.1-linux-x64.tar.xz"
+    #    dest: "{{ download_dir }}/nodejs.tar.xz"
+
+    #- name: Extract Node.js
+     # unarchive:
+       # src: "{{ download_dir }}/nodejs.tar.xz"
+       # dest: "/opt/nodejs"
+       # creates: "/opt/nodejs/node-v20.11.1-linux-x64"
+        #remote_src: yes
+
+    # PostgreSQL Installation :
+    
+    - name: Create PostgreSQL directory in /opt
+      file:
+        path: /opt/postgresql-16
+        state: directory
+        mode: '0755'
+
+    - name: Download PostgreSQL 16.0 tar
+      get_url:
+        url: https://ftp.postgresql.org/pub/source/v16.0/postgresql-16.0.tar.gz
+        dest: /opt/postgresql-16.0.tar.gz
+
+    - name: Extract PostgreSQL
+      unarchive:
+        src: /opt/postgresql-16.0.tar.gz
+        dest: /opt
+        remote_src: yes
+
+
+    # DBeaver Installation
+   
+#    - name: Create DBeaver directory
+#      file:
+#        path: "/opt/dbeaver"
+#        state: directory  
+#    - name: Download DBeaver
+#      get_url:
+#        url: "https://dbeaver.io/files/dbeaver-ce-latest-linux.gtk.x86_64.tar.gz"
+#        dest: "{{ download_dir }}/dbeaver.tar.gz"
+#   - name: Extract DBeaver
+#     unarchive:
+#       src: "/opt/dbeaver.tar.gz"
+#        dest: "/opt/dbeaver"
+#        creates: "/opt/dbeaver/dbeaver"
+#        remote_src: yes
+    # postman
+    - name: create directory for postaman
+      file:
+        path: "/opt/postman"
+        state: directory
+    
+    - name: postman
+      get_url:
+        url: "https://dl.pstmn.io/download/latest/linux_64?deviceId=d580413a-a285-4ed1-a674-28e29f1252a1"
+        dest: "/tmp/postman"
+    
+    - name: extract postman
+      unarchive :
+        src: "{{ download_dir }}/dbeaver.tar.gz"
+        dest: "/opt/postman"
+        creates: "/opt/postman/postman"
+        remote_src: yes
+
+
+
+    # Environment Setup
+    - name: Set up environment variables
+      blockinfile:
+        path: "/etc/profile.d/dev-tools.sh"
+        create: yes
+        mode: '0644'
+        block: |
+          # Java
+          export JAVA_HOME="/usr/lib/jvm/jdk-21.0.2"
+          
+          # Maven
+          export M2_HOME="/opt/maven/apache-maven-3.8.6"
+          
+          # Node.js
+          #export NODEJS_HOME="/opt/nodejs/node-v20.11.1-linux-x64"
+          
+          # Append to PATH
+          export PATH="$JAVA_HOME/bin:$M2_HOME/bin:$NODEJS_HOME/bin:$PATH"
+
+  
+    
+    # Verify installations
+    - name: Verify installations
+      block:
+        - name: Check Java version
+          command: java -version
+          register: java_version_check
+          changed_when: false
+
+        - name: Check Maven version
+          command: mvn -version
+          register: maven_version_check
+          changed_when: false
+
+#        - name: Check Node.js version
+#          command: node --version
+#          register: node_version_check
+#          changed_when: false
+
+        - name: Check PostgreSQL version
+          command: psql --version
+          register: psql_version_check
+          changed_when: false
+          ignore_errors: yes
+
+        - name: Display versions
+          debug:
+            msg:
+              - "Java version: {{ java_version_check.stderr }}"
+              - "Maven version: {{ maven_version_check.stdout_lines }}"
+ #             - "Node.js version: {{ node_version_check.stdout }}"
+              - "PostgreSQL version: {{ psql_version_check.stdout }}"
+
+    # Cleanup
+    - name: Cleanup downloaded files
+      file:
+        path: "{{ download_dir }}"
+        state: absent
